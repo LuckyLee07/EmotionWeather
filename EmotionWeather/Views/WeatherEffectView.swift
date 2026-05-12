@@ -48,12 +48,18 @@ struct WeatherEffectView: View {
                         .offset(y: -size.height * 0.22)
 
                 case .fog:
-                    ForEach(0..<4, id: \.self) { index in
+                    Color(hex: 0xD8E0E3)
+                        .opacity(0.16)
+
+                    ForEach(0..<6, id: \.self) { index in
                         Capsule()
-                            .fill(Color.white.opacity(0.20))
-                            .frame(width: size.width * (0.72 + CGFloat(index) * 0.11), height: size.height * 0.09)
-                            .blur(radius: 9)
-                            .offset(x: index.isMultiple(of: 2) ? -size.width * 0.12 : size.width * 0.10, y: -size.height * 0.18 + CGFloat(index) * size.height * 0.14)
+                            .fill(index.isMultiple(of: 2) ? Color.white.opacity(0.26) : Color(hex: 0xAEBCC4).opacity(0.18))
+                            .frame(width: size.width * (0.86 + CGFloat(index) * 0.08), height: size.height * 0.075)
+                            .blur(radius: 12)
+                            .offset(
+                                x: index.isMultiple(of: 2) ? -size.width * 0.18 : size.width * 0.16,
+                                y: -size.height * 0.24 + CGFloat(index) * size.height * 0.115
+                            )
                     }
 
                 case .rain:
@@ -90,21 +96,36 @@ struct WeatherEffectView: View {
                 case .snow:
                     VStack {
                         LinearGradient(
-                            colors: [Color.white.opacity(0.52), Color.white.opacity(0.05), .clear],
+                            colors: [Color.white.opacity(0.62), Color(hex: 0xD7ECF5).opacity(0.14), .clear],
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(height: size.height * 0.32)
+                        .frame(height: size.height * 0.38)
                         Spacer()
                     }
 
+                    VStack {
+                        Spacer()
+                        ZStack(alignment: .top) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.34))
+                                .frame(height: size.height * 0.20)
+
+                            Ellipse()
+                                .fill(Color.white.opacity(0.62))
+                                .frame(width: size.width * 0.76, height: size.height * 0.10)
+                                .offset(y: -size.height * 0.048)
+                        }
+                        .blur(radius: 0.6)
+                    }
+
                 case .wind:
-                    ForEach(0..<5, id: \.self) { index in
+                    ForEach(0..<7, id: \.self) { index in
                         Capsule()
-                            .fill(Color.white.opacity(0.20))
-                            .frame(width: size.width * (0.56 + CGFloat(index) * 0.07), height: 3)
-                            .rotationEffect(.degrees(index.isMultiple(of: 2) ? -12 : 10))
-                            .offset(x: CGFloat(index - 2) * size.width * 0.05, y: -size.height * 0.22 + CGFloat(index) * size.height * 0.13)
+                            .fill(index.isMultiple(of: 2) ? Color.white.opacity(0.28) : Color(hex: 0xDDF4EC).opacity(0.24))
+                            .frame(width: size.width * (0.52 + CGFloat(index) * 0.05), height: index.isMultiple(of: 2) ? 3 : 2)
+                            .rotationEffect(.degrees(-15 + Double(index % 3) * 4))
+                            .offset(x: -size.width * 0.16 + CGFloat(index) * size.width * 0.045, y: -size.height * 0.28 + CGFloat(index) * size.height * 0.105)
                             .blur(radius: 1.2)
                     }
 
@@ -125,15 +146,18 @@ struct WeatherEffectView: View {
                         .offset(y: size.height * 0.18)
 
                 case .moon:
+                    Color(hex: 0x071026)
+                        .opacity(0.38)
+
                     RadialGradient(
-                        colors: [Color(hex: 0xF5EAC8).opacity(0.12), .clear],
+                        colors: [Color(hex: 0xF5EAC8).opacity(0.20), .clear],
                         center: UnitPoint(x: 0.66, y: 0.22),
                         startRadius: 4,
                         endRadius: size.width * 0.58
                     )
 
                     LinearGradient(
-                        colors: [Color(hex: 0x0E172C).opacity(0.38), .clear],
+                        colors: [Color(hex: 0x0E172C).opacity(0.46), .clear],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -190,18 +214,18 @@ struct WeatherEffectView: View {
     }
 
     private func drawFog(time: TimeInterval, context: GraphicsContext, size: CGSize) {
-        for index in 0..<7 {
-            let y = size.height * (0.20 + Double(index) * 0.09)
-            let xOffset = sin(time * 0.18 + Double(index)) * size.width * 0.08
+        for index in 0..<10 {
+            let y = size.height * (0.14 + Double(index) * 0.075)
+            let xOffset = sin(time * 0.14 + Double(index) * 0.9) * size.width * 0.13
             let rect = CGRect(
-                x: -size.width * 0.16 + xOffset,
+                x: -size.width * 0.28 + xOffset,
                 y: y,
-                width: size.width * 1.32,
-                height: size.height * 0.12
+                width: size.width * 1.56,
+                height: size.height * (index.isMultiple(of: 2) ? 0.105 : 0.075)
             )
             context.fill(
                 Path(roundedRect: rect, cornerRadius: rect.height / 2),
-                with: .color(Color.white.opacity(0.23))
+                with: .color((index.isMultiple(of: 2) ? Color.white : Color(hex: 0xC7D2D8)).opacity(0.16))
             )
         }
     }
@@ -250,31 +274,53 @@ struct WeatherEffectView: View {
     }
 
     private func drawSnow(time: TimeInterval, context: GraphicsContext, size: CGSize) {
-        for index in 0..<28 {
+        for index in 0..<42 {
             let seed = Double(index)
             let baseX = size.width * (0.10 + 0.80 * fraction(seed * 0.271))
-            let x = baseX + sin(time * 0.35 + seed) * 8
-            let y = size.height * fraction(time * (0.055 + fraction(seed) * 0.035) + seed * 0.119)
-            let radius = 2 + fraction(seed * 0.77) * 2.4
+            let x = baseX + sin(time * 0.28 + seed) * 6
+            let y = size.height * fraction(time * (0.040 + fraction(seed) * 0.030) + seed * 0.119)
+            let radius = 1.4 + fraction(seed * 0.77) * 2.2
             context.fill(
                 Path(ellipseIn: CGRect(x: x, y: y, width: radius, height: radius)),
-                with: .color(Color.white.opacity(0.78))
+                with: .color(Color.white.opacity(0.82))
+            )
+        }
+
+        for index in 0..<9 {
+            let seed = Double(index)
+            let x = size.width * (0.16 + 0.68 * fraction(seed * 0.63))
+            let y = size.height * (0.72 + 0.10 * fraction(seed * 0.37))
+            let radius = 2.4 + fraction(seed * 0.51) * 3.8
+            context.fill(
+                Path(ellipseIn: CGRect(x: x, y: y, width: radius, height: radius * 0.74)),
+                with: .color(Color.white.opacity(0.42))
             )
         }
     }
 
     private func drawWind(time: TimeInterval, context: GraphicsContext, size: CGSize) {
-        for index in 0..<8 {
-            let y = size.height * (0.18 + Double(index) * 0.08)
-            let offset = sin(time * 0.6 + Double(index) * 0.7) * size.width * 0.12
+        for index in 0..<10 {
+            let y = size.height * (0.15 + Double(index) * 0.072)
+            let offset = sin(time * 0.78 + Double(index) * 0.7) * size.width * 0.18
             var path = Path()
-            path.move(to: CGPoint(x: size.width * 0.12 + offset, y: y))
+            path.move(to: CGPoint(x: size.width * 0.04 + offset, y: y))
             path.addCurve(
-                to: CGPoint(x: size.width * 0.88 + offset, y: y + 10),
-                control1: CGPoint(x: size.width * 0.33 + offset, y: y - 18),
-                control2: CGPoint(x: size.width * 0.62 + offset, y: y + 26)
+                to: CGPoint(x: size.width * 0.96 + offset, y: y + 8),
+                control1: CGPoint(x: size.width * 0.30 + offset, y: y - 16),
+                control2: CGPoint(x: size.width * 0.66 + offset, y: y + 22)
             )
-            context.stroke(path, with: .color(Color.white.opacity(0.35)), lineWidth: 1.4)
+            context.stroke(path, with: .color(Color.white.opacity(index.isMultiple(of: 2) ? 0.38 : 0.22)), lineWidth: index.isMultiple(of: 3) ? 1.8 : 1.1)
+        }
+
+        for index in 0..<7 {
+            let seed = Double(index)
+            let x = size.width * fraction(time * 0.08 + seed * 0.31)
+            let y = size.height * (0.18 + 0.58 * fraction(seed * 0.43))
+            var leaf = Path()
+            leaf.move(to: CGPoint(x: x, y: y))
+            leaf.addQuadCurve(to: CGPoint(x: x + 8, y: y + 3), control: CGPoint(x: x + 5, y: y - 5))
+            leaf.addQuadCurve(to: CGPoint(x: x, y: y), control: CGPoint(x: x + 4, y: y + 7))
+            context.fill(leaf, with: .color(Color(hex: 0xEAF5DD).opacity(0.34)))
         }
     }
 
@@ -311,15 +357,28 @@ struct WeatherEffectView: View {
             with: .color(Color(hex: 0x304B78).opacity(0.82))
         )
 
-        for index in 0..<18 {
+        for index in 0..<28 {
             let seed = Double(index)
-            let pulse = 0.25 + 0.35 * fraction(sin(time * 0.7 + seed))
+            let pulse = 0.20 + 0.50 * fraction(sin(time * 0.7 + seed))
             let x = size.width * (0.14 + 0.72 * fraction(seed * 0.341))
             let y = size.height * (0.18 + 0.62 * fraction(seed * 0.197))
+            let radius = index.isMultiple(of: 5) ? 3.1 : 2.0
             context.fill(
-                Path(ellipseIn: CGRect(x: x, y: y, width: 2.2, height: 2.2)),
+                Path(ellipseIn: CGRect(x: x, y: y, width: radius, height: radius)),
                 with: .color(Color.white.opacity(pulse))
             )
+        }
+
+        for index in 0..<3 {
+            let y = size.height * (0.62 + Double(index) * 0.08)
+            var path = Path()
+            path.move(to: CGPoint(x: size.width * 0.18, y: y))
+            path.addCurve(
+                to: CGPoint(x: size.width * 0.80, y: y + sin(time * 0.18 + Double(index)) * 5),
+                control1: CGPoint(x: size.width * 0.38, y: y - 8),
+                control2: CGPoint(x: size.width * 0.62, y: y + 8)
+            )
+            context.stroke(path, with: .color(Color(hex: 0xC8D4EF).opacity(0.10)), lineWidth: 1.2)
         }
     }
 

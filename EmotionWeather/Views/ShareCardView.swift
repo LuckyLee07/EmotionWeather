@@ -9,43 +9,74 @@ struct ShareCardView: View {
             LinearGradient(
                 colors: [
                     Color.weatherSurface,
-                    record.weatherType.backgroundColors.first ?? Color.weatherBackground,
+                    record.weatherType.backgroundColors.first?.opacity(0.86) ?? Color.weatherBackground,
+                    record.weatherType.primaryColor.opacity(0.20),
                     Color.weatherBackground
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
-            VStack(spacing: 44) {
-                VStack(spacing: 12) {
-                    Text("今天的我：\(record.weatherName)")
-                        .font(.system(size: 62, weight: .semibold, design: .serif))
-                        .foregroundStyle(Color.weatherInk)
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [record.weatherType.primaryColor.opacity(0.24), .clear],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 420
+                    )
+                )
+                .frame(width: 760, height: 760)
+                .offset(x: 240, y: -360)
 
-                    Text(record.quote)
-                        .font(.system(size: 34, weight: .regular, design: .serif))
-                        .foregroundStyle(Color.weatherInk.opacity(0.82))
+            VStack(spacing: 36) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(record.date.replacingOccurrences(of: "-", with: "."))
+                            .font(.system(size: 30, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.weatherMuted)
+
+                        Text("今天的我")
+                            .font(.system(size: 28, weight: .regular, design: .serif))
+                            .foregroundStyle(Color.weatherInk.opacity(0.72))
+                    }
+
+                    Spacer()
+
+                    Text("天气瓶")
+                        .font(.system(size: 32, weight: .semibold, design: .serif))
+                        .foregroundStyle(Color.weatherInk)
                 }
-                .multilineTextAlignment(.center)
+                .padding(.top, 88)
 
                 WeatherBottleView(
                     kind: record.weatherType,
                     isSealed: true,
                     sealedDate: record.date.replacingOccurrences(of: "-", with: ".")
                 )
-                    .frame(width: 330, height: 560)
+                .frame(width: 380, height: 646)
+                .padding(.top, 10)
 
-                VStack(spacing: 12) {
-                    Text(record.date.replacingOccurrences(of: "-", with: "."))
-                        .font(.system(size: 28, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.weatherMuted)
+                VStack(spacing: 20) {
+                    Label(record.weatherName, systemImage: record.weatherType.symbolName)
+                        .font(.system(size: 54, weight: .semibold, design: .serif))
+                        .foregroundStyle(record.weatherType.primaryColor)
 
-                    Text("天气瓶")
-                        .font(.system(size: 26, weight: .semibold, design: .serif))
-                        .foregroundStyle(Color.weatherInk)
+                    Text(record.quote)
+                        .font(.system(size: 38, weight: .regular, design: .serif))
+                        .lineSpacing(10)
+                        .foregroundStyle(Color.weatherInk.opacity(0.82))
+                        .multilineTextAlignment(.center)
                 }
+
+                Spacer(minLength: 0)
+
+                Text("今天的天气，已经被好好收起来了。")
+                    .font(.system(size: 24, weight: .regular, design: .serif))
+                    .foregroundStyle(Color.weatherMuted)
+                    .padding(.bottom, 76)
             }
-            .padding(.horizontal, 92)
+            .padding(.horizontal, 88)
         }
         .frame(width: 1080, height: 1440)
     }

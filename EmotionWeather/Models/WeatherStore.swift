@@ -41,6 +41,23 @@ final class WeatherStore: ObservableObject {
         persist()
     }
 
+    func seedCurrentMonthDemoData() {
+        let weatherPattern: [WeatherKind] = [
+            .sunny, .fog, .rain, .rain, .sunset, .moon, .sunny,
+            .wind, .snow, .fog, .sunny, .thunder, .rain, .sunset,
+            .sunny, .wind, .moon, .snow, .fog, .sunny, .rain
+        ]
+
+        let today = calendar.startOfDay(for: Date())
+        let monthDates = datesForMonth(containing: today).filter { $0 <= today }
+
+        for (index, date) in monthDates.enumerated() {
+            guard shouldSeedDemoRecord(on: date, index: index) else { continue }
+            let weather = weatherPattern[index % weatherPattern.count]
+            save(weather, on: date)
+        }
+    }
+
     func datesForCurrentWeek() -> [Date] {
         let today = calendar.startOfDay(for: Date())
         let weekday = calendar.component(.weekday, from: today)
@@ -50,19 +67,26 @@ final class WeatherStore: ObservableObject {
     }
 
     func datesForCurrentMonth() -> [Date] {
-        let today = Date()
-        guard let interval = calendar.dateInterval(of: .month, for: today) else {
-            return [today]
+        datesForMonth(containing: Date())
+    }
+
+    func monthSummaryText() -> String {
+        monthSummaryText(for: Date())
+    }
+
+    func datesForMonth(containing date: Date) -> [Date] {
+        guard let interval = calendar.dateInterval(of: .month, for: date) else {
+            return [date]
         }
 
         let dayCount = calendar.dateComponents([.day], from: interval.start, to: interval.end).day ?? 0
         return (0..<dayCount).compactMap { calendar.date(byAdding: .day, value: $0, to: interval.start) }
     }
 
-    func monthSummaryText() -> String {
-        let monthRecords = datesForCurrentMonth().compactMap { record(for: $0) }
+    func monthSummaryText(for month: Date) -> String {
+        let monthRecords = datesForMonth(containing: month).compactMap { record(for: $0) }
         guard !monthRecords.isEmpty else {
-            return "这个月，还没有收集天气。"
+            return "\(monthTitle(for: month))，还没有收集天气。"
         }
 
         let grouped = Dictionary(grouping: monthRecords, by: \.weatherType)
@@ -78,8 +102,8 @@ final class WeatherStore: ObservableObject {
 
         let countText = sorted
             .prefix(4)
-            .map { "\($0.1) 个\($0.0.name)" }
-            .joined(separator: "，")
+            .map { "\($0.1) \($0.0.name)" }
+            .joined(separator: " · ")
 
         let leading = sorted.first?.0
         let poetic: String
@@ -95,7 +119,33 @@ final class WeatherStore: ObservableObject {
         case nil: poetic = "这个月，你收集了许多种自己。"
         }
 
-        return "这个月，你收集了 \(countText)。\n\(poetic)"
+        return "\(shortMonthTitle(for: month))气候：\(countText)\n\(poetic)"
+    }
+
+    func monthTitle(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_Hans_CN")
+        formatter.dateFormat = "yyyy年M月"
+        return formatter.string(from: date)
+    }
+
+    func shortMonthTitle(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_Hans_CN")
+        formatter.dateFormat = "M月"
+        return formatter.string(from: date)
+    }
+
+    func monthByAdding(_ value: Int, to date: Date) -> Date {
+        calendar.date(byAdding: .month, value: value, to: date) ?? date
+    }
+
+    func canMoveToNextMonth(from date: Date) -> Bool {
+        guard let currentMonth = calendar.dateInterval(of: .month, for: Date())?.start,
+              let candidate = calendar.dateInterval(of: .month, for: monthByAdding(1, to: date))?.start else {
+            return false
+        }
+        return candidate <= currentMonth
     }
 
     func weekdayLabel(for date: Date) -> String {
@@ -114,8 +164,21 @@ final class WeatherStore: ObservableObject {
         return formatter.string(from: date)
     }
 
+    func fullDisplayDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_Hans_CN")
+        formatter.dateFormat = "yyyy年M月d日 EEEE"
+        return formatter.string(from: date)
+    }
+
     private func key(for date: Date) -> String {
         DateKey.formatter.string(from: calendar.startOfDay(for: date))
+    }
+
+    private func shouldSeedDemoRecord(on date: Date, index: Int) -> Bool {
+        let day = calendar.component(.day, from: date)
+        if day == calendar.component(.day, from: Date()) { return true }
+        return index % 5 != 3
     }
 
     private func load() {

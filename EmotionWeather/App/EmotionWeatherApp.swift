@@ -8,6 +8,11 @@ struct EmotionWeatherApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
+                .task {
+                    if ProcessInfo.processInfo.arguments.contains("--seed-demo") {
+                        store.seedCurrentMonthDemoData()
+                    }
+                }
         }
     }
 }
