@@ -4,6 +4,7 @@ import UIKit
 struct TodayView: View {
     @EnvironmentObject private var store: WeatherStore
     @State private var selectedKind: WeatherKind?
+    @State private var draftNote = ""
     @State private var showSavedMessage = false
     @State private var isSealing = false
     @State private var sharePreviewRecord: WeatherRecord?
@@ -31,7 +32,7 @@ struct TodayView: View {
                 background
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 13) {
                         header
 
                         WeatherBottleView(
@@ -40,8 +41,8 @@ struct TodayView: View {
                             sealedDate: shouldShowSealedBottle ? store.displayDate(Date()) : nil,
                             isCelebrating: isSealing
                         )
-                            .frame(maxWidth: 184)
-                            .frame(height: 318)
+                            .frame(maxWidth: 150)
+                            .frame(height: 258)
                             .padding(.top, 4)
                             .scaleEffect(isSealing ? 1.035 : 1)
                             .animation(.spring(response: 0.55, dampingFraction: 0.82), value: activeKind)
@@ -52,10 +53,12 @@ struct TodayView: View {
 
                         weatherPicker
 
+                        noteEditor
+
                         actionButtons
                     }
                     .padding(.horizontal, 22)
-                    .padding(.top, 14)
+                    .padding(.top, 8)
                     .padding(.bottom, 136)
                 }
 
@@ -66,12 +69,40 @@ struct TodayView: View {
             .navigationTitle("天气瓶")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                selectedKind = store.todayRecord?.weatherType
+                syncTodayRecord()
+            }
+            .onChange(of: store.todayRecord) { _, _ in
+                syncTodayRecord()
             }
             .sheet(item: $sharePreviewRecord) { record in
                 SharePreviewSheet(record: record)
                     .presentationDetents([.large])
             }
+        }
+    }
+
+    @ViewBuilder
+    private var noteEditor: some View {
+        if activeKind != nil || hasTodayRecord {
+            VStack(alignment: .leading, spacing: 7) {
+                Label("一句话备注", systemImage: "pencil.line")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.weatherMuted)
+
+                TextField("给今天留一句话", text: $draftNote, axis: .vertical)
+                    .font(.system(size: 16, weight: .regular, design: .serif))
+                    .lineLimit(1...2)
+                    .foregroundStyle(Color.weatherInk)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Color.weatherSurface.opacity(0.82), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Color.weatherLine, lineWidth: 1)
+                    }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 2)
         }
     }
 
@@ -85,9 +116,9 @@ struct TodayView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 9) {
-            Text("今天的你，是什么天气？")
-                .font(.system(size: 24, weight: .semibold, design: .serif))
+            VStack(spacing: 7) {
+                Text("今天的你，是什么天气？")
+                .font(.system(size: 23, weight: .semibold, design: .serif))
                 .foregroundStyle(Color.weatherInk)
 
             Text(formattedToday)
@@ -106,18 +137,18 @@ struct TodayView: View {
     @ViewBuilder
     private var quoteBlock: some View {
         if let activeKind {
-            VStack(spacing: 7) {
+            VStack(spacing: 6) {
                 Label(activeKind.name, systemImage: activeKind.symbolName)
                     .font(.headline)
                     .foregroundStyle(activeKind.primaryColor)
 
                 Text(activeKind.quote)
-                    .font(.system(size: 17, weight: .regular, design: .serif))
+                    .font(.system(size: 16, weight: .regular, design: .serif))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Color.weatherInk)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+            .padding(.vertical, 2)
         } else {
             Text("选择一种天气，把今天收进瓶子里。")
                 .font(.system(size: 16, weight: .regular, design: .serif))
@@ -128,7 +159,7 @@ struct TodayView: View {
 
     private var weatherPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 ForEach(WeatherKind.allCases) { kind in
                     WeatherOptionButton(
                         kind: kind,
@@ -146,7 +177,7 @@ struct TodayView: View {
     }
 
     private var actionButtons: some View {
-        VStack(spacing: 12) {
+        HStack(spacing: 10) {
             Button {
                 sealToday()
             } label: {
@@ -167,14 +198,20 @@ struct TodayView: View {
             Button {
                 shareToday()
             } label: {
-                Label("预览分享卡", systemImage: "square.and.arrow.up")
-                    .font(.subheadline.weight(.medium))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 20, weight: .semibold))
+                    .frame(width: 56, height: 54)
+                    .foregroundStyle(store.todayRecord == nil ? Color.weatherMuted : Color.weatherInk)
+                    .background(Color.weatherSurface.opacity(0.82), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(Color.weatherLine, lineWidth: 1)
+                    }
             }
-            .buttonStyle(.bordered)
-            .tint(.weatherInk)
+            .buttonStyle(.plain)
+            .opacity(store.todayRecord == nil ? 0.72 : 1)
             .disabled(store.todayRecord == nil)
+            .accessibilityLabel("预览分享卡")
         }
     }
 
@@ -240,7 +277,7 @@ struct TodayView: View {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
 
         withAnimation(.spring(response: 0.48, dampingFraction: 0.78)) {
-            store.save(activeKind)
+            store.save(activeKind, note: draftNote, replacesNote: true)
             selectedKind = activeKind
             showSavedMessage = true
             isSealing = true
@@ -263,6 +300,11 @@ struct TodayView: View {
         guard let record = store.todayRecord else { return }
         sharePreviewRecord = record
     }
+
+    private func syncTodayRecord() {
+        selectedKind = store.todayRecord?.weatherType
+        draftNote = store.todayRecord?.displayNote ?? ""
+    }
 }
 
 private struct WeatherOptionButton: View {
@@ -281,7 +323,7 @@ private struct WeatherOptionButton: View {
                     .font(.caption.weight(.medium))
             }
             .foregroundStyle(isSelected ? Color.white : Color.weatherInk)
-            .frame(width: 66, height: 70)
+            .frame(width: 60, height: 62)
             .background {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(isSelected ? kind.primaryColor : Color.weatherSurface.opacity(0.78))

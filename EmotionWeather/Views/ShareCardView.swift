@@ -67,11 +67,26 @@ struct ShareCardView: View {
                         .lineSpacing(10)
                         .foregroundStyle(Color.weatherInk.opacity(0.82))
                         .multilineTextAlignment(.center)
+
+                    if let note = record.displayNote {
+                        Text("“\(note)”")
+                            .font(.system(size: 30, weight: .regular, design: .serif))
+                            .lineSpacing(8)
+                            .foregroundStyle(Color.weatherInk.opacity(0.74))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                            .padding(.vertical, 22)
+                            .background(Color.white.opacity(0.34), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                    .stroke(Color.white.opacity(0.32), lineWidth: 1)
+                            }
+                    }
                 }
 
                 Spacer(minLength: 0)
 
-                Text("今天的天气，已经被好好收起来了。")
+                Text(record.displayNote == nil ? "今天的天气，已经被好好收起来了。" : "这一天，被好好收起来了。")
                     .font(.system(size: 24, weight: .regular, design: .serif))
                     .foregroundStyle(Color.weatherMuted)
                     .padding(.bottom, 76)

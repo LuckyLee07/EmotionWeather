@@ -1,7 +1,9 @@
 import SwiftUI
+import UserNotifications
 
 struct ProfileView: View {
     @EnvironmentObject private var store: WeatherStore
+    @StateObject private var reminderStore = ReminderSettingsStore()
     @State private var showClearConfirmation = false
     @State private var showDemoDataMessage = false
 
@@ -32,6 +34,29 @@ struct ProfileView: View {
                         Label("默认玻璃瓶", systemImage: "testtube.2")
                         Label("分享时显示日期", systemImage: "calendar")
                         Label("本地保存", systemImage: "lock")
+                    }
+
+                    Section("提醒") {
+                        Toggle(isOn: Binding(
+                            get: { reminderStore.isEnabled },
+                            set: { reminderStore.setEnabled($0) }
+                        )) {
+                            Label("每天提醒我记录", systemImage: "bell.badge")
+                        }
+
+                        DatePicker(
+                            "提醒时间",
+                            selection: Binding(
+                                get: { reminderStore.reminderDate },
+                                set: { reminderStore.setReminderDate($0) }
+                            ),
+                            displayedComponents: .hourAndMinute
+                        )
+                        .disabled(!reminderStore.isEnabled)
+
+                        Text(reminderStore.statusText)
+                            .font(.caption)
+                            .foregroundStyle(Color.weatherMuted)
                     }
 
                     Section("开发") {
@@ -101,6 +126,139 @@ struct ProfileView: View {
             } message: {
                 Text("这会删除本机保存的全部天气记录。")
             }
+            .task {
+                await reminderStore.refreshAuthorizationStatus()
+            }
         }
+    }
+}
+
+@MainActor
+private final class ReminderSettingsStore: ObservableObject {
+    @Published private(set) var isEnabled: Bool
+    @Published private(set) var statusText: String
+    @Published var reminderDate: Date
+
+    private let notificationID = "daily-weather-bottle-reminder"
+    private let enabledKey = "ReminderSettings.isEnabled"
+    private let hourKey = "ReminderSettings.hour"
+    private let minuteKey = "ReminderSettings.minute"
+
+    init() {
+        let defaults = UserDefaults.standard
+        let savedIsEnabled = defaults.bool(forKey: enabledKey)
+
+        var components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        components.hour = defaults.object(forKey: hourKey) as? Int ?? 21
+        components.minute = defaults.object(forKey: minuteKey) as? Int ?? 0
+        let savedReminderDate = Calendar.current.date(from: components) ?? Date()
+
+        isEnabled = savedIsEnabled
+        reminderDate = savedReminderDate
+        statusText = savedIsEnabled ? "每天 \(Self.timeText(for: savedReminderDate)) 提醒你记录天气。" : "提醒已关闭。"
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        if enabled {
+            Task {
+                await enableReminder()
+            }
+        } else {
+            isEnabled = false
+            persist()
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [notificationID])
+            statusText = "提醒已关闭。"
+        }
+    }
+
+    func setReminderDate(_ date: Date) {
+        reminderDate = date
+        persist()
+
+        if isEnabled {
+            Task {
+                await scheduleReminder()
+            }
+        } else {
+            statusText = "提醒已关闭。"
+        }
+    }
+
+    func refreshAuthorizationStatus() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        if isEnabled {
+            switch settings.authorizationStatus {
+            case .authorized, .provisional, .ephemeral:
+                statusText = "每天 \(Self.timeText(for: reminderDate)) 提醒你记录天气。"
+            case .denied:
+                statusText = "通知权限未开启，请到系统设置里允许通知。"
+            default:
+                statusText = "开启后会请求通知权限。"
+            }
+        }
+    }
+
+    private func enableReminder() async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+
+        let isAuthorized: Bool
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            isAuthorized = true
+        case .denied:
+            isAuthorized = false
+        default:
+            isAuthorized = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+        }
+
+        guard isAuthorized else {
+            isEnabled = false
+            persist()
+            statusText = "通知权限未开启，请到系统设置里允许通知。"
+            return
+        }
+
+        isEnabled = true
+        persist()
+        await scheduleReminder()
+    }
+
+    private func scheduleReminder() async {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [notificationID])
+
+        let content = UNMutableNotificationContent()
+        content.title = "今天的天气还没封存"
+        content.body = "花十秒，把今天的自己放进天气瓶。"
+        content.sound = .default
+
+        var dateComponents = Calendar.current.dateComponents([.hour, .minute], from: reminderDate)
+        dateComponents.second = 0
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        let request = UNNotificationRequest(identifier: notificationID, content: content, trigger: trigger)
+
+        do {
+            try await center.add(request)
+            statusText = "每天 \(Self.timeText(for: reminderDate)) 提醒你记录天气。"
+        } catch {
+            statusText = "提醒保存失败，请稍后再试。"
+        }
+    }
+
+    private func persist() {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: reminderDate)
+        let defaults = UserDefaults.standard
+        defaults.set(isEnabled, forKey: enabledKey)
+        defaults.set(components.hour ?? 21, forKey: hourKey)
+        defaults.set(components.minute ?? 0, forKey: minuteKey)
+    }
+
+    private static func timeText(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_Hans_CN")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
 }

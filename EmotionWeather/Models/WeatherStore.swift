@@ -29,9 +29,25 @@ final class WeatherStore: ObservableObject {
         records[key(for: date)]
     }
 
-    func save(_ weatherType: WeatherKind, on date: Date = Date()) {
+    func save(_ weatherType: WeatherKind, on date: Date = Date(), note: String? = nil, replacesNote: Bool = false) {
         let key = key(for: date)
-        let record = WeatherRecord(date: date, weatherType: weatherType, existing: records[key])
+        let record = WeatherRecord(
+            date: date,
+            weatherType: weatherType,
+            note: note,
+            replacesNote: replacesNote,
+            existing: records[key]
+        )
+        records[key] = record
+        persist()
+    }
+
+    func updateNote(_ note: String, on date: Date = Date()) {
+        let key = key(for: date)
+        guard var record = records[key] else { return }
+
+        record.note = WeatherRecord.normalizedNote(note)
+        record.updatedAt = Date()
         records[key] = record
         persist()
     }
@@ -47,6 +63,13 @@ final class WeatherStore: ObservableObject {
             .wind, .snow, .fog, .sunny, .thunder, .rain, .sunset,
             .sunny, .wind, .moon, .snow, .fog, .sunny, .rain
         ]
+        let notePattern = [
+            "今天有一点轻松。",
+            "慢慢把自己找回来。",
+            "说不出来，但记一下。",
+            "这一天值得被收好。",
+            "状态比早上稳定些。"
+        ]
 
         let today = calendar.startOfDay(for: Date())
         let monthDates = datesForMonth(containing: today).filter { $0 <= today }
@@ -54,7 +77,8 @@ final class WeatherStore: ObservableObject {
         for (index, date) in monthDates.enumerated() {
             guard shouldSeedDemoRecord(on: date, index: index) else { continue }
             let weather = weatherPattern[index % weatherPattern.count]
-            save(weather, on: date)
+            let note = index % 3 == 0 ? notePattern[index % notePattern.count] : nil
+            save(weather, on: date, note: note)
         }
     }
 
@@ -84,9 +108,24 @@ final class WeatherStore: ObservableObject {
     }
 
     func monthSummaryText(for month: Date) -> String {
-        let monthRecords = datesForMonth(containing: month).compactMap { record(for: $0) }
+        monthReview(for: month).summaryText
+    }
+
+    func monthReview(for month: Date) -> MonthReview {
+        let monthDates = datesForMonth(containing: month)
+        let monthRecords = monthDates.compactMap { record(for: $0) }
         guard !monthRecords.isEmpty else {
-            return "\(monthTitle(for: month))，还没有收集天气。"
+            return MonthReview(
+                monthTitle: monthTitle(for: month),
+                shortMonthTitle: shortMonthTitle(for: month),
+                recordedCount: 0,
+                totalDays: monthDates.count,
+                longestStreak: 0,
+                noteCount: 0,
+                dominantWeather: nil,
+                distributionText: "还没有收集天气",
+                summaryText: "\(monthTitle(for: month))，还没有收集天气。"
+            )
         }
 
         let grouped = Dictionary(grouping: monthRecords, by: \.weatherType)
@@ -106,6 +145,7 @@ final class WeatherStore: ObservableObject {
             .joined(separator: " · ")
 
         let leading = sorted.first?.0
+        let noteCount = monthRecords.filter { $0.displayNote != nil }.count
         let poetic: String
         switch leading {
         case .sunny: poetic = "这个月的你，大多明亮，也偶尔有别的天气。"
@@ -119,7 +159,17 @@ final class WeatherStore: ObservableObject {
         case nil: poetic = "这个月，你收集了许多种自己。"
         }
 
-        return "\(shortMonthTitle(for: month))气候：\(countText)\n\(poetic)"
+        return MonthReview(
+            monthTitle: monthTitle(for: month),
+            shortMonthTitle: shortMonthTitle(for: month),
+            recordedCount: monthRecords.count,
+            totalDays: monthDates.count,
+            longestStreak: longestStreak(in: monthDates),
+            noteCount: noteCount,
+            dominantWeather: leading,
+            distributionText: countText,
+            summaryText: "\(shortMonthTitle(for: month))气候：\(countText)\n\(poetic)"
+        )
     }
 
     func monthTitle(for date: Date) -> String {
@@ -181,6 +231,22 @@ final class WeatherStore: ObservableObject {
         return index % 5 != 3
     }
 
+    private func longestStreak(in dates: [Date]) -> Int {
+        var longest = 0
+        var current = 0
+
+        for date in dates {
+            if record(for: date) == nil {
+                current = 0
+            } else {
+                current += 1
+                longest = max(longest, current)
+            }
+        }
+
+        return longest
+    }
+
     private func load() {
         guard let data = try? Data(contentsOf: storeURL) else {
             records = [:]
@@ -213,5 +279,22 @@ final class WeatherStore: ObservableObject {
         return baseURL
             .appendingPathComponent("EmotionWeather", isDirectory: true)
             .appendingPathComponent("weather-records.json")
+    }
+}
+
+struct MonthReview {
+    let monthTitle: String
+    let shortMonthTitle: String
+    let recordedCount: Int
+    let totalDays: Int
+    let longestStreak: Int
+    let noteCount: Int
+    let dominantWeather: WeatherKind?
+    let distributionText: String
+    let summaryText: String
+
+    var progressText: String {
+        guard totalDays > 0 else { return "0%" }
+        return "\(Int((Double(recordedCount) / Double(totalDays) * 100).rounded()))%"
     }
 }
