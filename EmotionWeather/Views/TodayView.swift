@@ -6,7 +6,7 @@ struct TodayView: View {
     @State private var selectedKind: WeatherKind?
     @State private var showSavedMessage = false
     @State private var isSealing = false
-    @StateObject private var shareRenderer = ShareImageRenderer()
+    @State private var sharePreviewRecord: WeatherRecord?
 
     var activeKind: WeatherKind? {
         selectedKind ?? store.todayRecord?.weatherType
@@ -68,8 +68,9 @@ struct TodayView: View {
             .onAppear {
                 selectedKind = store.todayRecord?.weatherType
             }
-            .sheet(item: $shareRenderer.shareItem) { item in
-                ActivityView(activityItems: [item.url])
+            .sheet(item: $sharePreviewRecord) { record in
+                SharePreviewSheet(record: record)
+                    .presentationDetents([.large])
             }
         }
     }
@@ -166,7 +167,7 @@ struct TodayView: View {
             Button {
                 shareToday()
             } label: {
-                Label("分享今日天气", systemImage: "square.and.arrow.up")
+                Label("预览分享卡", systemImage: "square.and.arrow.up")
                     .font(.subheadline.weight(.medium))
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
@@ -260,7 +261,7 @@ struct TodayView: View {
 
     private func shareToday() {
         guard let record = store.todayRecord else { return }
-        shareRenderer.render(record: record)
+        sharePreviewRecord = record
     }
 }
 

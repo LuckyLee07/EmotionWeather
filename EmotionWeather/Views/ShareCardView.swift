@@ -82,15 +82,98 @@ struct ShareCardView: View {
     }
 }
 
+struct SharePreviewSheet: View {
+    let record: WeatherRecord
+
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var renderer = ShareImageRenderer()
+    @State private var previewImage: UIImage?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LinearGradient(
+                    colors: [Color.weatherBackground, Color(hex: 0xEEF3F2), Color.weatherSurface],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 18) {
+                        previewCard
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.top, 18)
+                    .padding(.bottom, 24)
+                }
+                .safeAreaInset(edge: .bottom) {
+                    shareBar
+                }
+            }
+            .navigationTitle("分享卡")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(item: $renderer.shareItem) { item in
+                ActivityView(activityItems: [item.url])
+            }
+            .onAppear {
+                previewImage = renderer.makeImage(record: record)
+            }
+        }
+    }
+
+    private var shareBar: some View {
+        Button {
+            renderer.render(record: record)
+        } label: {
+            Label("分享这张卡", systemImage: "square.and.arrow.up")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .foregroundStyle(Color.white)
+                .background(record.weatherType.primaryColor, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 22)
+        .padding(.top, 14)
+        .padding(.bottom, 18)
+        .background(.ultraThinMaterial)
+    }
+
+    private var previewCard: some View {
+        Group {
+            if let previewImage {
+                Image(uiImage: previewImage)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                ProgressView()
+                    .tint(record.weatherType.primaryColor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+            .frame(maxWidth: 324)
+            .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            .background(Color.weatherSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .shadow(color: Color.black.opacity(0.14), radius: 26, x: 0, y: 16)
+            .accessibilityLabel("今日天气分享卡预览")
+    }
+}
+
 @MainActor
 final class ShareImageRenderer: ObservableObject {
     @Published var shareItem: ShareImageItem?
 
     func render(record: WeatherRecord) {
-        let renderer = ImageRenderer(content: ShareCardView(record: record))
-        renderer.scale = 1
-
-        guard let image = renderer.uiImage,
+        guard let image = makeImage(record: record),
               let data = image.pngData() else {
             return
         }
@@ -104,6 +187,12 @@ final class ShareImageRenderer: ObservableObject {
         } catch {
             assertionFailure("Failed to write share image: \(error)")
         }
+    }
+
+    func makeImage(record: WeatherRecord) -> UIImage? {
+        let renderer = ImageRenderer(content: ShareCardView(record: record))
+        renderer.scale = 1
+        return renderer.uiImage
     }
 }
 

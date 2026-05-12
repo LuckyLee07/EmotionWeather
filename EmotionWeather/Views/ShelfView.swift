@@ -2,9 +2,13 @@ import SwiftUI
 
 struct ShelfView: View {
     @EnvironmentObject private var store: WeatherStore
-    @State private var mode: ShelfMode = .week
+    @State private var mode: ShelfMode
     @State private var selectedDate: Date?
     @State private var selectedMonth = Date()
+
+    init(startsInMonthMode: Bool = false) {
+        _mode = State(initialValue: startsInMonthMode ? .month : .week)
+    }
 
     var body: some View {
         NavigationStack {
@@ -79,25 +83,63 @@ struct ShelfView: View {
     }
 
     private var monthShelf: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
-
-        return LazyVGrid(columns: columns, spacing: 14) {
-            ForEach(store.datesForMonth(containing: selectedMonth), id: \.self) { date in
-                Button {
-                    selectedDate = date
-                } label: {
-                    ShelfBottleCell(
-                        date: date,
-                        topLabel: store.dayLabel(for: date),
-                        bottomLabel: nil,
-                        record: store.record(for: date),
-                        compact: true
-                    )
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { label in
+                    Text(label)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.weatherMuted)
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 2)
+
+            ForEach(Array(monthRows.enumerated()), id: \.offset) { _, row in
+                VStack(spacing: 5) {
+                    HStack(alignment: .bottom, spacing: 8) {
+                        ForEach(Array(row.enumerated()), id: \.offset) { _, date in
+                            if let date {
+                                Button {
+                                    selectedDate = date
+                                } label: {
+                                    ShelfBottleCell(
+                                        date: date,
+                                        topLabel: store.dayLabel(for: date),
+                                        bottomLabel: nil,
+                                        record: store.record(for: date),
+                                        compact: true
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Color.clear
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 96)
+                            }
+                        }
+                    }
+
+                    shelfLine
+                }
             }
         }
         .padding(.horizontal, 18)
+        .padding(.top, 2)
+    }
+
+    private var monthRows: [[Date?]] {
+        let dates = store.datesForMonth(containing: selectedMonth)
+        guard let firstDate = dates.first else { return [] }
+
+        let weekday = Calendar.current.component(.weekday, from: firstDate)
+        let leadingBlankCount = (weekday + 5) % 7
+        let filledSlots: [Date?] = Array(repeating: nil, count: leadingBlankCount) + dates.map(Optional.some)
+        let trailingBlankCount = (7 - filledSlots.count % 7) % 7
+        let allSlots = filledSlots + Array(repeating: nil, count: trailingBlankCount)
+
+        return stride(from: 0, to: allSlots.count, by: 7).map { start in
+            Array(allSlots[start..<min(start + 7, allSlots.count)])
+        }
     }
 
     private var monthHeader: some View {
@@ -145,13 +187,13 @@ struct ShelfView: View {
         RoundedRectangle(cornerRadius: 2)
             .fill(
                 LinearGradient(
-                    colors: [Color(hex: 0xD8C6AE), Color(hex: 0xF2E6D6)],
+                    colors: [Color(hex: 0xCDB79B), Color(hex: 0xF2E6D6), Color(hex: 0xD8C6AE)],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
             )
-            .frame(height: 7)
-            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+            .frame(height: 6)
+            .shadow(color: Color.black.opacity(0.07), radius: 7, x: 0, y: 4)
     }
 
     private var summaryBlock: some View {
@@ -161,11 +203,11 @@ struct ShelfView: View {
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.weatherInk)
             .padding(.horizontal, 24)
-            .padding(.vertical, 18)
+            .padding(.vertical, 16)
             .frame(maxWidth: .infinity)
-            .background(Color.weatherSurface.opacity(0.78), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.weatherSurface.opacity(0.78), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(Color.weatherLine, lineWidth: 1)
             }
             .padding(.horizontal, 22)

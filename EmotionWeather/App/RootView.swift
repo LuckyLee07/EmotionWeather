@@ -16,7 +16,7 @@ struct RootView: View {
                         Label("今天", systemImage: "cloud.sun")
                     }
 
-                ShelfView()
+                ShelfView(startsInMonthMode: ProcessInfo.processInfo.arguments.contains("--open-month-shelf"))
                     .tag(AppTab.shelf)
                     .tabItem {
                         Label("瓶架", systemImage: "tray.full")
